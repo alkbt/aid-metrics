@@ -1,0 +1,91 @@
+# Go Code Metrics
+
+A command-line tool and library for analyzing Go modules to calculate Robert Martin's package design metrics:
+- Instability (I)
+- Abstractness (A)
+- Distance from the main sequence (D)
+
+## Installation
+
+```
+go install github.com/alkbt/aid-metrics/cmd/aid-metrics@latest
+```
+
+## Usage
+
+### As a CLI tool
+
+```bash
+# Analyze the current module
+aid-metrics
+
+# Analyze a specific module
+aid-metrics /path/to/module
+
+# Choose output format (text, csv, json)
+aid-metrics -format=json
+
+# Filter packages to analyze
+aid-metrics -pattern="./pkg/..."
+```
+
+### As a library
+
+```go
+package main
+
+import (
+    "fmt"
+    "os"
+    
+    "github.com/alkbt/aid-metrics/pkg/analyzer"
+    "github.com/alkbt/aid-metrics/pkg/reporter"
+)
+
+func main() {
+    // Analyze a module
+    metrics, err := analyzer.AnalyzeModule("/path/to/module", "./...")
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+        os.Exit(1)
+    }
+    
+    // Generate a report
+    r := reporter.NewReporter(metrics, reporter.FormatType("json"))
+    if err := r.Generate(os.Stdout); err != nil {
+        fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+        os.Exit(1)
+    }
+}
+```
+
+## Metrics Explanation
+
+### Instability (I)
+- **Formula**: I = Ce / (Ca + Ce)
+- **Range**: 0 (stable) to 1 (unstable)
+- **Meaning**: How likely a package is to change. Higher instability indicates higher dependency on other packages.
+
+### Abstractness (A)
+- **Formula**: A = Na / Nc
+- **Range**: 0 (concrete) to 1 (abstract)
+- **Meaning**: The ratio of abstract types to all types in a package.
+  - Na: Number of abstract types (interfaces)
+  - Nc: Total number of concrete types (interfaces, structs) plus standalone functions
+    - Only structs and standalone functions are counted as concrete types
+    - Other type definitions (type aliases, etc.) are not counted
+
+### Distance (D)
+- **Formula**: D = |A + I - 1|
+- **Range**: 0 (optimal) to 1 (problematic)
+- **Meaning**: How far a package is from the "main sequence" (A + I = 1)
+  - Packages with D=0 are either:
+    - Stable and abstract (good for core functionality)
+    - Unstable and concrete (good for application-specific code)
+  - Packages with high D are either:
+    - Stable and concrete ("pain") - hard to extend
+    - Unstable and abstract ("waste") - over-engineered
+
+## License
+
+MIT 
