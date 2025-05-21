@@ -1,8 +1,8 @@
 # AID-Metrics
 
 A command-line tool and library for analyzing Go modules to calculate Robert Martin's package design metrics:
-- Instability (I)
 - Abstractness (A)
+- Instability (I)
 - Distance from the main sequence (D)
 
 ## Installation
