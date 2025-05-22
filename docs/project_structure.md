@@ -25,6 +25,12 @@ aid-metrics
 │   └── reporter/         # Output reporting
 │       └── reporter.go   # Report generation in various formats
 └── test/                 # Test utilities and fixtures
+    └── testmodule/       # Test module for validating analysis
+        ├── pkg1/         # Test package with nested subpackage
+        │   └── pkg2/     # Nested test package
+        ├── pkg3/         # Test package with dependencies
+        ├── main.go       # Test module entry point
+        └── go.mod        # Module definition for tests
 ```
 
 ## Component Details
@@ -46,6 +52,11 @@ aid-metrics
   - Identifies dependencies between packages
   - Counts abstract and concrete types
   - Calculates instability, abstractness, and distance metrics
+  - Key features:
+    - Detects standard library imports reliably by checking module path from go.mod
+    - Handles various module naming conventions (including those without dots)
+    - Properly maps package import paths to friendly names in reports
+    - Supports concurrent package analysis
 
 - **pkg/analyzer/analyzer_test.go**: Unit tests for the analyzer
 
@@ -62,9 +73,33 @@ aid-metrics
   - Supports multiple output formats (text, CSV, JSON)
   - Organizes metric data for presentation
 
+### Test Utilities
+
+- **test/testmodule/**: A sample Go module for testing
+  - Contains packages with different dependency relationships
+  - Used to validate analyzer functionality
+  - Includes a simple module name without dots to test edge cases
+
 ## Usage Modes
 
 aid-metrics can be used in two ways:
 
 1. **As a CLI tool**: Running the `aid-metrics` command to analyze modules and output reports
-2. **As a library**: Importing the `analyzer` and `reporter` packages for programmatic use 
+2. **As a library**: Importing the `analyzer` and `reporter` packages for programmatic use
+
+## Key Concepts
+
+### Standard Library Detection
+
+The analyzer needs to differentiate between standard library packages, local module packages, and external dependencies. It does this by:
+
+1. Reading the module path from go.mod
+2. Comparing import paths against the module path
+3. Using additional heuristics to identify standard library packages
+
+### Package Path Resolution
+
+For reporting purposes, the analyzer:
+1. Displays package paths relative to their module
+2. Handles different module naming conventions (GitHub-style and simple names)
+3. Preserves the package hierarchy to show the logical structure 

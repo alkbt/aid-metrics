@@ -1,8 +1,9 @@
 package pkg3
 
 import (
-	"github.com/alkbt/testmodule/pkg1"
-	"github.com/alkbt/testmodule/pkg2"
+	"testmodule/pkg1/pkg2"
+
+	"testmodule/pkg1"
 )
 
 // No interfaces here, only concrete types

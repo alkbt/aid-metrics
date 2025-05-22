@@ -29,6 +29,33 @@ aid-metrics -format=json
 aid-metrics -pattern="./pkg/..."
 ```
 
+### Example Output
+
+When running the tool, you'll see output similar to this:
+
+```
+Analyzing Go module at: /path/to/module
+Generating text report...
+MODULE: /path/to/module
+
+PACKAGE          Ca  Ce  I     Na  Nc  A     D
+-------          --  --  -     --  --  -     -
+cmd/app          0   2   1.00  0   1   0.00  0.00
+pkg/analyzer     1   2   0.67  0   5   0.00  0.33
+pkg/models       2   0   0.00  0   2   0.00  1.00
+pkg/reporter     1   1   0.50  0   4   0.00  0.50
+```
+
+Where:
+- `PACKAGE`: Package path relative to the module
+- `Ca`: Afferent Coupling (number of packages that depend on this package)
+- `Ce`: Efferent Coupling (number of packages this package depends on)
+- `I`: Instability (Ce / (Ca + Ce))
+- `Na`: Number of abstract types (interfaces)
+- `Nc`: Number of concrete types (structs + standalone functions)
+- `A`: Abstractness (Na / Nc)
+- `D`: Distance from the main sequence (|A + I - 1|)
+
 ### As a library
 
 ```go

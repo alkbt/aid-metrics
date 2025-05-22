@@ -48,7 +48,7 @@ func TestTypesCounting(t *testing.T) {
 		dependencies:   make(map[string][]string),
 		reverseDepends: make(map[string][]string),
 		abstractTypes:  make(map[string]int),
-		concreteTypes:  make(map[string]int),
+		totalTypes:     make(map[string]int),
 	}
 
 	// Create simple test case
@@ -60,7 +60,7 @@ func TestTypesCounting(t *testing.T) {
 	// Manually set the values (like the code would do)
 	analyzer.dependencies[pkgID] = []string{} // Add to dependencies to ensure it's included in metrics
 	analyzer.abstractTypes[pkgID] = abstractCount
-	analyzer.concreteTypes[pkgID] = abstractCount + concreteCount + funcCount
+	analyzer.totalTypes[pkgID] = abstractCount + concreteCount + funcCount
 
 	// Calculate metrics
 	metrics := analyzer.calculateMetrics()

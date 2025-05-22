@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/alkbt/testmodule/pkg3"
+	"testmodule/pkg3"
 )
 
 func main() {
