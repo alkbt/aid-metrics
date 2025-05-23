@@ -16,6 +16,19 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
+// AnalyzerOptions configures the behavior of ModuleAnalyzer.
+// It allows customization of progress reporting and performance tuning.
+type AnalyzerOptions struct {
+	// ProgressReporter provides feedback during analysis operations.
+	// If nil, no progress reporting will be done.
+	ProgressReporter models.ProgressReporter
+	
+	// BatchSize controls how many packages are loaded at once.
+	// Larger values use more memory but may be faster.
+	// Default is 20 if not specified.
+	BatchSize int
+}
+
 // ModuleAnalyzer performs analysis on a Go module
 type ModuleAnalyzer struct {
 	modulePath     string
@@ -27,10 +40,31 @@ type ModuleAnalyzer struct {
 
 	// Cache for the module path from go.mod
 	moduleName string
+	
+	// Options for configuring analyzer behavior
+	options AnalyzerOptions
 }
 
 // NewModuleAnalyzer creates a new ModuleAnalyzer
 func NewModuleAnalyzer(modulePath string, packageFilter string) *ModuleAnalyzer {
+	return NewModuleAnalyzerWithOptions(modulePath, packageFilter, AnalyzerOptions{})
+}
+
+// NewModuleAnalyzerWithOptions creates a new ModuleAnalyzer with custom options.
+// This allows configuration of progress reporting and performance tuning.
+//
+// Example:
+//   opts := AnalyzerOptions{
+//       ProgressReporter: reporter.NewConsoleProgressReporter(),
+//       BatchSize: 50,
+//   }
+//   analyzer := NewModuleAnalyzerWithOptions(".", "./...", opts)
+func NewModuleAnalyzerWithOptions(modulePath string, packageFilter string, options AnalyzerOptions) *ModuleAnalyzer {
+	// Set default batch size if not specified
+	if options.BatchSize == 0 {
+		options.BatchSize = 100
+	}
+	
 	analyzer := &ModuleAnalyzer{
 		modulePath:     modulePath,
 		packageFilter:  packageFilter,
@@ -39,6 +73,7 @@ func NewModuleAnalyzer(modulePath string, packageFilter string) *ModuleAnalyzer 
 		abstractTypes:  make(map[string]int),
 		totalTypes:     make(map[string]int),
 		moduleName:     readModuleName(modulePath),
+		options:        options,
 	}
 
 	return analyzer
@@ -47,6 +82,13 @@ func NewModuleAnalyzer(modulePath string, packageFilter string) *ModuleAnalyzer 
 // AnalyzeModule analyzes a Go module and returns metrics
 func AnalyzeModule(modulePath string, packageFilter string) (*models.ModuleMetrics, error) {
 	analyzer := NewModuleAnalyzer(modulePath, packageFilter)
+	return analyzer.Analyze()
+}
+
+// AnalyzeModuleWithOptions analyzes a Go module with custom options and returns metrics.
+// This is the preferred method when progress reporting or custom configuration is needed.
+func AnalyzeModuleWithOptions(modulePath string, packageFilter string, options AnalyzerOptions) (*models.ModuleMetrics, error) {
+	analyzer := NewModuleAnalyzerWithOptions(modulePath, packageFilter, options)
 	return analyzer.Analyze()
 }
 
@@ -69,23 +111,73 @@ func (a *ModuleAnalyzer) Analyze() (*models.ModuleMetrics, error) {
 	return metrics, nil
 }
 
-// findPackages finds all Go packages in the module
+// findPackages finds all Go packages in the module using discovery and batch loading
 func (a *ModuleAnalyzer) findPackages() ([]*packages.Package, error) {
-	config := &packages.Config{
-		Mode: packages.NeedName | packages.NeedFiles | packages.NeedImports | packages.NeedDeps | packages.NeedTypes,
-		Dir:  a.modulePath,
+	// Initialize progress reporter if available
+	if a.options.ProgressReporter != nil {
+		a.options.ProgressReporter.SetTotal(100)
 	}
-
+	
+	// Phase 1: Discovery (0-10 on progress scale)
+	if a.options.ProgressReporter != nil {
+		a.options.ProgressReporter.Update(0, "Discovering packages...")
+	}
+	
+	// Progress callback for discovery
+	progressFunc := func(found int) {
+		if a.options.ProgressReporter != nil {
+			// Cap at 10 for discovery phase
+			progress := found / 3
+			if progress > 10 {
+				progress = 10
+			}
+			// Show count for large projects
+			if found > 100 {
+				a.options.ProgressReporter.Update(progress, fmt.Sprintf("Discovering packages... (%d found)", found))
+			} else {
+				a.options.ProgressReporter.Update(progress, "Discovering packages...")
+			}
+		}
+	}
+	
+	// Discover packages
 	pattern := "./..."
 	if a.packageFilter != "" {
 		pattern = a.packageFilter
 	}
-
-	pkgs, err := packages.Load(config, pattern)
+	
+	packageInfos, err := discoverPackages(a.modulePath, a.moduleName, pattern, progressFunc)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to discover packages: %w", err)
 	}
-
+	
+	if len(packageInfos) == 0 {
+		if a.options.ProgressReporter != nil {
+			a.options.ProgressReporter.Complete()
+		}
+		return []*packages.Package{}, nil
+	}
+	
+	// Update progress to show discovery complete
+	if a.options.ProgressReporter != nil {
+		a.options.ProgressReporter.Update(10, fmt.Sprintf("Found %d packages, starting to load...", len(packageInfos)))
+	}
+	
+	// Phase 2: Loading (10-80 on progress scale)
+	config := &packages.Config{
+		Mode: packages.NeedName | packages.NeedFiles | packages.NeedImports | packages.NeedDeps | packages.NeedTypes,
+		Dir:  a.modulePath,
+	}
+	
+	// Create batch loader
+	loader := NewBatchLoader(a.options.BatchSize, config, a.options.ProgressReporter, len(packageInfos))
+	
+	// Load packages in batches
+	pkgs, err := loader.LoadPackages(packageInfos)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load packages: %w", err)
+	}
+	
 	return pkgs, nil
 }
 
@@ -100,6 +192,13 @@ type packageAnalysisResult struct {
 
 // parsePackages parses all Go packages to extract dependencies and count types
 func (a *ModuleAnalyzer) parsePackages(pkgs []*packages.Package) error {
+	// Phase 3: Analysis (80-100 on progress scale)
+	progressStart := 80
+	progressEnd := 100
+	progressRange := progressEnd - progressStart
+	packagesAnalyzed := 0
+	totalPackages := len(pkgs)
+	
 	// Create a worker pool with a reasonable number of workers
 	numWorkers := runtime.NumCPU()
 	if numWorkers > 8 {
@@ -154,6 +253,24 @@ func (a *ModuleAnalyzer) parsePackages(pkgs []*packages.Package) error {
 
 		a.abstractTypes[result.packageID] = result.abstractCount
 		a.totalTypes[result.packageID] = result.totalTypesCount
+		
+		// Update progress
+		packagesAnalyzed++
+		if a.options.ProgressReporter != nil {
+			progress := progressStart + (packagesAnalyzed * progressRange / totalPackages)
+			if progress > progressEnd {
+				progress = progressEnd
+			}
+			relPath := a.getRelativePackagePath(result.packageID)
+			// Use shorter path for display
+			shortPath := shortenPackagePath(relPath)
+			a.options.ProgressReporter.Update(progress, fmt.Sprintf("Analyzing %s", shortPath))
+		}
+	}
+	
+	// Mark analysis complete
+	if a.options.ProgressReporter != nil {
+		a.options.ProgressReporter.Complete()
 	}
 
 	return nil
@@ -372,3 +489,4 @@ func getPackageName(importPath string) string {
 	parts := strings.Split(importPath, "/")
 	return parts[len(parts)-1]
 }
+

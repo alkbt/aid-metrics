@@ -27,6 +27,15 @@ aid-metrics -format=json
 
 # Filter packages to analyze
 aid-metrics -pattern="./pkg/..."
+
+# Show progress bar during analysis (useful for large projects)
+aid-metrics -progress
+
+# Customize batch size for package loading (default: 100)
+aid-metrics -progress -batch-size=50
+
+# Combine flags for customized analysis
+aid-metrics -progress -format=json -pattern="./pkg/..."
 ```
 
 ### Example Output
@@ -70,8 +79,19 @@ import (
 )
 
 func main() {
-    // Analyze a module
+    // Basic usage
     metrics, err := analyzer.AnalyzeModule("/path/to/module", "./...")
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+        os.Exit(1)
+    }
+    
+    // With progress reporting
+    opts := analyzer.AnalyzerOptions{
+        ProgressReporter: reporter.NewConsoleProgressReporter(),
+        BatchSize:        50,
+    }
+    metrics, err = analyzer.AnalyzeModuleWithOptions("/path/to/module", "./...", opts)
     if err != nil {
         fmt.Fprintf(os.Stderr, "Error: %v\n", err)
         os.Exit(1)
@@ -112,6 +132,13 @@ func main() {
   - Packages with high D are either:
     - Stable and concrete ("pain") - hard to extend
     - Unstable and abstract ("waste") - over-engineered
+
+## Documentation
+
+See the [docs/](docs/) directory for:
+- Implementation plans and feature documentation
+- Architecture decisions
+- Development guides
 
 ## License
 
