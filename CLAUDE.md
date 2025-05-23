@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is **gometro** (formerly aid-metrics), a Go code quality analysis tool that calculates Robert Martin's package design metrics:
+This is **aid-metrics**, a Go code quality analysis tool that calculates Robert Martin's package design metrics:
 - **Abstractness (A)**: Ratio of interfaces to total types
 - **Instability (I)**: Measure of package dependencies (Ce/(Ca+Ce))
 - **Distance from Main Sequence (D)**: Distance from optimal design balance

@@ -1,6 +1,6 @@
 # Documentation
 
-This directory contains technical documentation for the gometro (aid-metrics) project.
+This directory contains technical documentation for the aid-metrics project.
 
 ## Structure
 

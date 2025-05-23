@@ -1,7 +1,7 @@
 # Progress Reporting Feature Implementation Plan
 
 ## Overview
-This document outlines the implementation plan for adding progress reporting capabilities to gometro (aid-metrics) when analyzing large Go projects.
+This document outlines the implementation plan for adding progress reporting capabilities to aid-metrics when analyzing large Go projects.
 
 ## Problem Statement
 Currently, `packages.Load(config, pattern)` loads all packages at once without any progress feedback, which can be problematic for large projects where the analysis might take significant time.
