@@ -19,11 +19,15 @@ aid-metrics
 ├── pkg/                  # Core library packages
 │   ├── analyzer/         # Package analysis implementation
 │   │   ├── analyzer.go   # Module analysis logic
-│   │   └── analyzer_test.go  # Tests for analyzer
+│   │   ├── analyzer_test.go  # Tests for analyzer
+│   │   ├── discovery.go  # Package discovery without loading
+│   │   └── loader.go     # Batch loading for large projects
 │   ├── models/           # Data models
-│   │   └── metrics.go    # Package metrics data structures
+│   │   ├── metrics.go    # Package metrics data structures
+│   │   └── progress.go   # Progress reporting interface
 │   └── reporter/         # Output reporting
-│       └── reporter.go   # Report generation in various formats
+│       ├── reporter.go   # Report generation in various formats
+│       └── progress.go   # Console progress bar implementation
 └── test/                 # Test utilities and fixtures
     └── testmodule/       # Test module for validating analysis
         ├── pkg1/         # Test package with nested subpackage
@@ -42,6 +46,9 @@ aid-metrics
   - Determines the module path to analyze
   - Invokes the analyzer with the specified pattern
   - Generates and outputs the report in the requested format
+  - New flags:
+    - `-progress`: Shows progress bar during analysis
+    - `-batch-size`: Controls batch size for loading (default: 100)
 
 ### Core Library Packages
 
@@ -57,8 +64,21 @@ aid-metrics
     - Handles various module naming conventions (including those without dots)
     - Properly maps package import paths to friendly names in reports
     - Supports concurrent package analysis
+    - Integrates with progress reporting for large projects
 
 - **pkg/analyzer/analyzer_test.go**: Unit tests for the analyzer
+
+- **pkg/analyzer/discovery.go**: Package discovery functionality
+  - Performs fast filesystem traversal to find Go packages
+  - Supports pattern matching (e.g., "./...", specific paths)
+  - Reports progress during discovery phase
+  - Returns package information without loading full AST
+
+- **pkg/analyzer/loader.go**: Batch loading for memory efficiency
+  - Loads packages in configurable batches
+  - Reduces memory usage for large projects
+  - Enables progress reporting during the loading phase
+  - Maintains compatibility with original packages.Load behavior
 
 #### Models
 
@@ -67,11 +87,21 @@ aid-metrics
     - Includes counts (Ca, Ce, Na, Nc) and calculated metrics (I, A, D)
   - `ModuleMetrics`: Collects metrics for all packages in a module
 
+- **pkg/models/progress.go**: Progress reporting interface
+  - `ProgressReporter`: Interface for progress updates
+  - Simple 3-method API: SetTotal, Update, Complete
+  - Enables pluggable progress implementations
+
 #### Reporter
 
 - **pkg/reporter/reporter.go**: Generates formatted reports
   - Supports multiple output formats (text, CSV, JSON)
   - Organizes metric data for presentation
+
+- **pkg/reporter/progress.go**: Console progress bar implementation
+  - `ConsoleProgressReporter`: Terminal progress bar using schollz/progressbar
+  - Thread-safe for concurrent operations
+  - Fixed 0-100 scale with phase-based progress
 
 ### Test Utilities
 
